@@ -658,9 +658,9 @@ PAGE = """<!doctype html>
   .update-btn{display:flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;
               border:1px solid var(--card-brd);border-radius:12px;background:var(--card);
               color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap}
+  .update-glyph{font-size:15px;line-height:1;font-weight:850}
   .update-btn[data-ready="1"]{border-color:color-mix(in srgb,var(--a) 38%,var(--card-brd));
                                background:var(--a-soft);color:var(--a)}
-  .update-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
   .overview{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:2px 0 20px}
   .overview-copy{min-width:0}
   .eyebrow{margin:0 0 5px;color:var(--a);font-size:9px;font-weight:850;letter-spacing:.17em}
@@ -757,8 +757,8 @@ PAGE = """<!doctype html>
     </div>
     <div class="h-right">
      <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
-     <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
-       <span class="update-dot"></span><span class="update-label" id="updateLabel">Updates</span></button>
+      <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
+       <span class="update-glyph" aria-hidden="true">↓</span><span class="update-label" id="updateLabel">Updates</span></button>
      <button class="themebtn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
      <button class="iconbtn" id="info" type="button" aria-label="How Tally works">i</button>
      <button class="reset" id="reset" type="button">Reset</button>

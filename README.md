@@ -14,7 +14,13 @@ The blue scorecard icon is the visual anchor: clear blue actions, calm surfaces,
 and a strong score-first layout. Cameron and Paget retain distinct blue and
 orange accents so scores are easy to tell apart.
 
-![Tally scoreboard](docs/tally-dashboard.png)
+![Tally dashboard, light desktop](docs/tally-dashboard.png)
+
+| Phone, light | Phone, dark |
+|:--:|:--:|
+| ![Tally phone light](docs/tally-phone-light.png) | ![Tally phone dark](docs/tally-phone-dark.png) |
+
+![Tally dashboard, dark desktop](docs/tally-dashboard-dark.png)
 
 ![Tally in-app GitHub updater](docs/tally-updates.png)
 
