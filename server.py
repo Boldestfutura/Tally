@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.4"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -1493,7 +1493,7 @@ function paintUpdate(d){
   updateCurrent.textContent='v'+(d.current||APP_VERSION);
   updateLatest.textContent='v'+latest;
   updateButton.dataset.ready=available?'1':'0';
-  updateLabel.textContent=available?'Update available':'v'+(d.current||APP_VERSION);
+  updateLabel.textContent=available?'Update available':'Updates';
   updateState.textContent=available?'Version v'+latest+' is ready to install':
     busy?(d.message||'Installing update…'):
     d.state==='error'?(d.message||'Could not check GitHub'):
