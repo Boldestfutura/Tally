@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -290,10 +290,19 @@ def write_update_status(state, latest=None, message="", available=False, checked
 
 
 def check_update():
-    """Compare VERSION in the public GitHub branch with this running copy."""
-    url = "https://raw.githubusercontent.com/%s/%s/VERSION" % (UPDATE_REPO, UPDATE_BRANCH)
-    req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater"})
+    """Compare VERSION at GitHub's current branch commit with this running copy."""
     try:
+        api = "https://api.github.com/repos/%s/commits/%s" % (UPDATE_REPO, UPDATE_BRANCH)
+        req = urllib.request.Request(api, headers={"User-Agent": "Tally-updater",
+                                                    "Accept": "application/vnd.github+json",
+                                                    "Cache-Control": "no-cache"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            sha = json.loads(r.read(1 << 20)).get("sha", "")
+        if not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ValueError("GitHub did not return a commit id")
+        url = "https://raw.githubusercontent.com/%s/%s/VERSION" % (UPDATE_REPO, sha)
+        req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater",
+                                                    "Cache-Control": "no-cache"})
         with urllib.request.urlopen(req, timeout=15) as r:
             latest = r.read(128).decode("ascii", "replace").strip()
         if not re.match(r"^\d+\.\d+\.\d+$", latest):

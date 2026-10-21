@@ -1,3 +1,4 @@
+import io
 import tempfile
 import json
 import unittest
@@ -66,6 +67,18 @@ class ScoreStateTests(unittest.TestCase):
     def test_semantic_version_ordering(self):
         self.assertGreater(server._version_tuple("2.1.0"), server._version_tuple("2.0.9"))
         self.assertFalse(server._version_tuple("2.0.0") > server._version_tuple("2.0.0"))
+
+    def test_update_check_fetches_version_from_latest_immutable_commit(self):
+        sha = "a" * 40
+        responses = [io.BytesIO(json.dumps({"sha": sha}).encode()), io.BytesIO(b"2.1.0\n")]
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(server, "UPDATE_DIR", d), \
+             patch.object(server, "UPDATE_STATUS_FILE", d + "/update-status.json"), \
+             patch.object(server.urllib.request, "urlopen", side_effect=responses) as opened:
+            status = server.check_update()
+        self.assertTrue(status["available"])
+        self.assertEqual(status["latest"], "2.1.0")
+        self.assertIn("/" + sha + "/VERSION", opened.call_args_list[1].args[0].full_url)
 
 
 if __name__ == "__main__":

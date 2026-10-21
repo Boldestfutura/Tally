@@ -52,9 +52,22 @@ def write_status(state, current, latest, message, available=False):
         raise
 
 
-def fetch(name):
-    url = "https://raw.githubusercontent.com/%s/%s/%s" % (REPO, BRANCH, name)
-    req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater"})
+def latest_commit():
+    url = "https://api.github.com/repos/%s/commits/%s" % (REPO, BRANCH)
+    req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater",
+                                               "Accept": "application/vnd.github+json",
+                                               "Cache-Control": "no-cache"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        sha = json.loads(r.read(1 << 20)).get("sha", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("GitHub did not return a commit id")
+    return sha
+
+
+def fetch(name, sha):
+    url = "https://raw.githubusercontent.com/%s/%s/%s" % (REPO, sha, name)
+    req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater",
+                                               "Cache-Control": "no-cache"})
     with urllib.request.urlopen(req, timeout=30) as r:
         data = r.read(MAX_FILE + 1)
     if not data or len(data) > MAX_FILE:
@@ -84,7 +97,8 @@ def _run_request():
     current = installed_version()
     latest = current
     try:
-        latest = fetch("VERSION").decode("ascii").strip()
+        sha = latest_commit()
+        latest = fetch("VERSION", sha).decode("ascii").strip()
         if not re.fullmatch(r"\d+\.\d+\.\d+", latest):
             raise ValueError("GitHub VERSION is not x.y.z")
         if tuple(map(int, latest.split("."))) <= tuple(map(int, current.split("."))):
@@ -95,7 +109,7 @@ def _run_request():
         with tempfile.TemporaryDirectory(prefix=".tally-release-", dir=DATA_DIR) as td:
             stage = Path(td)
             for name in FILES:
-                (stage / name).write_bytes(fetch(name))
+                (stage / name).write_bytes(fetch(name, sha))
 
             server = (stage / "server.py").read_text()
             version = re.search(r'^APP_VERSION\s*=\s*["\']([^"\']+)', server, re.M)

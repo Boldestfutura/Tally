@@ -45,7 +45,8 @@ class UpdateWorkerTests(unittest.TestCase):
                 "install-worker.sh":b"#!/bin/sh\n",
                 "README.md":b"Tally 2.0.0",
             }
-            with patch.object(worker,"fetch",side_effect=lambda n:payloads[n]), \
+            with patch.object(worker,"latest_commit",return_value="a"*40), \
+                 patch.object(worker,"fetch",side_effect=lambda n,sha:payloads[n]), \
                  patch.object(worker.subprocess,"run",return_value=SimpleNamespace(returncode=0,stderr="",stdout="")) as run:
                 self.assertEqual(worker.main(),0)
             self.assertEqual((app/"server.py").read_bytes(),payloads["server.py"])
