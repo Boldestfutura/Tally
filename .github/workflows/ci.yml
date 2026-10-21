@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check versions and compile
+        run: |
+          test "$(cat VERSION)" = "$(python3 -c 'import re; print(re.search(r"^APP_VERSION = \"([^\"]+)\"", open("server.py").read(), re.M).group(1))')"
+          python -m py_compile server.py update-worker.py
+      - name: Test scoring
+        run: python -m unittest discover -s tests -v

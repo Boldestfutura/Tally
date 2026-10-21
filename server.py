@@ -6,6 +6,7 @@ import re
 import tempfile
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DATA = os.environ.get("TALLY_DATA", "/data/tally.json")
@@ -13,15 +14,23 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "1.3.4"
+APP_VERSION = "2.0.0"
+UPDATE_REPO = "Boldestfutura/Tally"
+UPDATE_BRANCH = "main"
+UPDATE_DIR = os.path.dirname(DATA) or "."
+UPDATE_STATUS_FILE = os.path.join(UPDATE_DIR, "update-status.json")
+UPDATE_REQUEST_FILE = os.path.join(UPDATE_DIR, "update.req")
+UPDATE_CHECK_SECONDS = 30 * 60
 
 # Without this the app simply will not open with no signal, and a scoreboard
 # you cannot open on a plane is the whole problem. Shell only - the state comes
 # from the queue in localStorage, never from a stale cached response.
 SW = """
-const CACHE = 'tally-%s';
-const SHELL = ['/', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png',
-               '/icon-512.png', '/icon-512-maskable.png'];
+const VERSION = '%s';
+const CACHE = 'tally-' + VERSION;
+const SHELL = ['/', '/manifest.webmanifest?v=' + VERSION,
+               '/icon-180.png?v=' + VERSION, '/icon-192.png?v=' + VERSION,
+               '/icon-512.png?v=' + VERSION, '/icon-512-maskable.png?v=' + VERSION];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -236,23 +245,113 @@ def save(state):
         raise
 
 
+def _version_tuple(value):
+    try:
+        return tuple(int(part) for part in str(value).strip().lstrip("v").split("."))
+    except (TypeError, ValueError):
+        return ()
+
+
+def update_status():
+    try:
+        with open(UPDATE_STATUS_FILE) as fh:
+            d = json.load(fh)
+        if isinstance(d, dict):
+            return {"current": APP_VERSION, "latest": d.get("latest") or APP_VERSION,
+                    "available": bool(d.get("available")),
+                    "state": d.get("state") or "idle",
+                    "message": d.get("message") or "",
+                    "checked": d.get("checked")}
+    except (OSError, ValueError):
+        pass
+    return {"current": APP_VERSION, "latest": APP_VERSION,
+            "available": False, "state": "checking", "message": "Checking GitHub"}
+
+
+def write_update_status(state, latest=None, message="", available=False, checked=None):
+    os.makedirs(UPDATE_DIR, exist_ok=True)
+    row = {"current": APP_VERSION, "latest": latest or APP_VERSION,
+           "available": bool(available), "state": state, "message": message,
+           "checked": int(checked or time.time())}
+    fd, tmp = tempfile.mkstemp(dir=UPDATE_DIR, prefix=".update-status-")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(row, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, UPDATE_STATUS_FILE)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return row
+
+
+def check_update():
+    """Compare VERSION in the public GitHub branch with this running copy."""
+    url = "https://raw.githubusercontent.com/%s/%s/VERSION" % (UPDATE_REPO, UPDATE_BRANCH)
+    req = urllib.request.Request(url, headers={"User-Agent": "Tally-updater"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            latest = r.read(128).decode("ascii", "replace").strip()
+        if not re.match(r"^\d+\.\d+\.\d+$", latest):
+            raise ValueError("GitHub VERSION is not a stable x.y.z version")
+        available = _version_tuple(latest) > _version_tuple(APP_VERSION)
+        state = "available" if available else "current"
+        message = "Update available" if available else "Tally is up to date"
+        return write_update_status(state, latest, message, available)
+    except Exception as e:
+        old = update_status()
+        return write_update_status("error", old.get("latest"),
+                                  "Could not check GitHub: %s" % str(e)[:120],
+                                  old.get("available", False))
+
+
+def update_check_loop():
+    while True:
+        check_update()
+        time.sleep(UPDATE_CHECK_SECONDS)
+
+
+def request_update():
+    status = update_status()
+    if not status.get("available"):
+        status = check_update()
+    if not status.get("available"):
+        return False, status.get("message") or "Tally is up to date"
+    try:
+        os.makedirs(UPDATE_DIR, exist_ok=True)
+        if os.path.exists(UPDATE_REQUEST_FILE):
+            return True, "update already queued"
+        with open(UPDATE_REQUEST_FILE, "x") as fh:
+            json.dump({"requested": int(time.time()), "version": status.get("latest")}, fh)
+        write_update_status("queued", status.get("latest"), "Update queued on the NAS", True)
+    except FileExistsError:
+        return True, "update already queued"
+    except OSError as e:
+        return False, "could not queue update: %s" % str(e)[:120]
+    return True, "update queued; Tally will restart when it is installed"
+
+
 PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b0d11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#edf3ff" media="(prefers-color-scheme: light)" id="themeLight">
+<meta name="theme-color" content="#090f1d" media="(prefers-color-scheme: dark)" id="themeDark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Tally">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=__APP_VERSION__">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png?v=__APP_VERSION__">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=__APP_VERSION__">
+<link rel="manifest" href="/manifest.webmanifest?v=__APP_VERSION__">
 <title>Tally</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 42 34'%3E%3Cg fill='none' stroke-width='3.4' stroke-linecap='round'%3E%3Cpath stroke='%232f6df6' d='M7 6V28'/%3E%3Cpath stroke='%232f6df6' d='M15 6V28'/%3E%3Cpath stroke='%23f97316' d='M23 6V28'/%3E%3Cpath stroke='%23f97316' d='M31 6V28'/%3E%3Cpath stroke='%236b7280' d='M3.5 26.5 34.5 7.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
   :root{
     color-scheme: light dark;
@@ -505,6 +604,127 @@ PAGE = """<!doctype html>
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:.001ms !important;transition-duration:.001ms !important}
   }
+
+  /* ---- Tally 2.0: the scoreboard mark sets the visual language ---------- */
+  :root{
+    --bg:#edf3ff;--card:#fff;--card-brd:#dbe5f6;--ink:#111a2d;--muted:#64718b;
+    --faint:rgba(25,45,78,.055);--shadow:0 16px 42px -28px rgba(19,42,85,.38);
+    --a:#2563eb;--a-soft:rgba(37,99,235,.12);--b:#f97316;--b-soft:rgba(249,115,22,.13);
+    --ring:rgba(37,99,235,.3);--radius:24px
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;--bg:#090f1d;--card:#111b2d;--card-brd:rgba(164,190,238,.13);
+    --ink:#f3f6fc;--muted:#96a5bf;--faint:rgba(255,255,255,.055);
+    --shadow:0 20px 56px -30px rgba(0,0,0,.8);--a:#6d9cff;--a-soft:rgba(91,140,255,.17);
+    --b:#ff9b55;--b-soft:rgba(255,140,58,.17);--ring:rgba(109,156,255,.4)
+  }
+  :root[data-theme="light"]{color-scheme:light}
+  @media(prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      color-scheme:dark;--bg:#090f1d;--card:#111b2d;--card-brd:rgba(164,190,238,.13);
+      --ink:#f3f6fc;--muted:#96a5bf;--faint:rgba(255,255,255,.055);
+      --shadow:0 20px 56px -30px rgba(0,0,0,.8);--a:#6d9cff;--a-soft:rgba(91,140,255,.17);
+      --b:#ff9b55;--b-soft:rgba(255,140,58,.17);--ring:rgba(109,156,255,.4)
+    }
+  }
+  body{background:var(--bg);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       transition:background .25s ease,color .25s ease}
+  .wrap{max-width:980px;padding:0 clamp(16px,4vw,34px)}
+  header{padding:8px 2px 24px;gap:16px}
+  .h-left{gap:12px}
+  .logo{width:44px;height:44px;border-radius:13px;object-fit:cover;box-shadow:0 7px 20px -8px var(--a)}
+  .titles{gap:4px}
+  .brand{font-size:16px;letter-spacing:.11em;color:var(--ink);font-weight:800}
+  .tagline{margin:0;color:var(--muted);font-size:11px;font-weight:550;letter-spacing:.015em}
+  .period{font-size:11.5px;letter-spacing:.055em;color:var(--muted);font-weight:650}
+  .h-right{gap:8px}
+  .sync{padding:7px 10px;border:1px solid var(--card-brd);border-radius:999px;
+        background:var(--card);font-size:11px;font-weight:650;min-height:32px}
+  .iconbtn,.themebtn{width:36px;height:36px;border:1px solid var(--card-brd);border-radius:12px;
+        background:var(--card);color:var(--muted);box-shadow:0 2px 8px rgba(18,38,74,.04)}
+  .iconbtn{font-size:15px}
+  .themebtn{font-size:17px;line-height:1}
+  .reset{padding:9px 13px;border:1px solid var(--card-brd);border-radius:12px;
+         background:var(--card);color:var(--muted);font-weight:700}
+  .update-btn{display:flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;
+              border:1px solid var(--card-brd);border-radius:12px;background:var(--card);
+              color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap}
+  .update-btn[data-ready="1"]{border-color:color-mix(in srgb,var(--a) 38%,var(--card-brd));
+                               background:var(--a-soft);color:var(--a)}
+  .update-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .overview{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:2px 0 20px}
+  .overview-copy{min-width:0}
+  .eyebrow{margin:0 0 5px;color:var(--a);font-size:9px;font-weight:850;letter-spacing:.17em}
+  .overview h1{margin:0;font-size:clamp(24px,5vw,34px);line-height:1.08;letter-spacing:-.045em}
+  .overview .lead{margin:7px 0 0;min-height:1.25em;text-align:left;font-size:12px;font-weight:650}
+  .life{flex:0 0 auto;align-items:center;flex-direction:row;justify-content:space-between;gap:18px;
+        margin:0;padding:12px 15px;border:1px solid var(--card-brd);
+        border-radius:16px;background:var(--card);box-shadow:var(--shadow)}
+  .life .cap{font-size:10px;letter-spacing:.15em;color:var(--muted)}
+  .life .vals{gap:9px}
+  .life b{font-size:clamp(22px,4vw,30px);font-weight:800}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+                margin:0 2px 10px;color:var(--ink);font-size:13px;font-weight:800}
+  .section-head span+span{color:var(--muted);font-size:10.5px;font-weight:600}
+  .grid{gap:14px}
+  @media(min-width:640px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .card{padding:clamp(16px,2.6vw,24px);border-radius:22px;border:1px solid var(--card-brd);
+        background:var(--card);box-shadow:var(--shadow);text-align:left;transition:transform .2s ease}
+  .card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--accent)}
+  .card[data-lead="1"]{transform:translateY(-2px)}
+  .card[data-who="cameron"]{--accent:var(--a);--accent-soft:var(--a-soft)}
+  .card[data-who="paget"]{--accent:var(--b);--accent-soft:var(--b-soft)}
+  .name{justify-content:flex-start;margin:0;color:var(--ink);font-size:14px;font-weight:750}
+  .name::before{content:attr(data-initial);display:grid;place-items:center;width:28px;height:28px;
+                border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:12px;
+                font-weight:850;letter-spacing:0}
+  .score{margin:14px 0 3px;font-size:clamp(70px,13vw,108px);font-weight:780;letter-spacing:-.065em}
+  .pts{margin:0 0 18px;font-size:10px;letter-spacing:.16em;color:var(--muted)}
+  .row{gap:10px}
+  .row button{min-height:54px;border-radius:15px}
+  .sub{flex:0 0 82px;font-size:22px;background:var(--faint);border-color:var(--card-brd);color:var(--muted)}
+  .add{font-size:18px;font-weight:800;background:var(--accent);box-shadow:0 8px 20px -10px var(--accent)}
+  .nudge{padding:9px 14px;border-radius:12px;background:var(--a-soft);color:var(--a);
+         font-size:12px;font-weight:700}
+  .nudge:empty{display:none}
+  .hist{margin-top:22px;border:1px solid var(--card-brd);border-radius:18px;
+        background:var(--card);box-shadow:var(--shadow)}
+  .hist-h{padding:15px 18px 12px}
+  .hist-h b{color:var(--ink);font-size:10px;letter-spacing:.13em}
+  .mrow{padding:13px 18px}
+  .mrow.live{background:var(--a-soft)}
+  .iconbtn:hover,.themebtn:hover,.reset:hover,.update-btn:hover{color:var(--a);border-color:var(--ring)}
+  .modal{border:1px solid var(--card-brd);border-radius:22px;background:var(--card)}
+  .sheet{max-width:440px}
+  .m-title{font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .ver{font-variant-numeric:tabular-nums}
+  .m-no{border:1px solid var(--card-brd)}
+  .m-yes{background:var(--a);box-shadow:0 8px 18px -10px var(--a)}
+  .update-sheet{text-align:left}
+  .update-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .update-kicker{margin:0 0 3px;color:var(--a);font-size:9px;font-weight:850;letter-spacing:.17em}
+  .update-head .m-title{margin:0}
+  .update-close{width:34px;height:34px;flex:0 0 auto;padding:0;border:1px solid var(--card-brd);
+                border-radius:11px;background:var(--faint);color:var(--muted);font-size:20px}
+  .update-message{margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+  .update-sheet .update-state{margin:0 0 15px;padding:12px 14px;border-radius:13px;
+        background:var(--a-soft);color:var(--a);font-size:13px;font-weight:700}
+  .update-sheet .update-versions{display:flex;justify-content:space-between;gap:12px;margin:0 0 18px;
+        color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+  .update-sheet .m-row{margin-top:12px}
+  .update-sheet .update-check{background:var(--faint);color:var(--ink);border:1px solid var(--card-brd)}
+  .update-sheet .update-install{background:var(--a);color:#fff}
+  .update-sheet .update-install:disabled{opacity:.5}
+  @media(max-width:520px){
+    .wrap{padding:0 15px}
+    header{flex-wrap:wrap;padding-bottom:17px}
+    .h-right{gap:6px}
+    .update-btn{width:36px;padding:0;justify-content:center}
+    .update-btn .update-label{display:none}
+    .overview{align-items:flex-start;flex-direction:column;gap:12px}
+    .life{width:100%;padding:11px 13px}
+    .sub{flex-basis:66px}
+  }
 </style>
 </head>
 <body>
@@ -514,34 +734,37 @@ PAGE = """<!doctype html>
 <div class="wrap">
   <header>
    <div class="h-left">
-    <svg class="logo" width="38" height="31" viewBox="0 0 42 34" role="img" aria-label="Tally">
-      <g fill="none" stroke-width="3.1" stroke-linecap="round">
-        <path class="sa" d="M7 6V28"/>
-        <path class="sa" d="M15 6V28"/>
-        <path class="sb" d="M23 6V28"/>
-        <path class="sb" d="M31 6V28"/>
-        <path class="slash" d="M3.5 26.5 34.5 7.5"/>
-      </g>
-    </svg>
-    <div class="titles">
-      <p class="brand">Tally</p>
-      <p class="period" id="period"></p>
+     <img class="logo" src="/icon-192.png?v=__APP_VERSION__" alt="Tally logo">
+     <div class="titles">
+       <p class="brand">Tally</p>
+       <p class="tagline">A little friendly competition</p>
+       <p class="period" id="period"></p>
+     </div>
     </div>
-   </div>
-   <div class="h-right">
-    <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
-    <button class="iconbtn" id="info" type="button" aria-label="How Tally works">i</button>
-    <button class="reset" id="reset" type="button">Reset</button>
+    <div class="h-right">
+     <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
+     <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
+       <span class="update-dot"></span><span class="update-label" id="updateLabel">Updates</span></button>
+     <button class="themebtn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
+     <button class="iconbtn" id="info" type="button" aria-label="How Tally works">i</button>
+     <button class="reset" id="reset" type="button">Reset</button>
    </div>
   </header>
 
-  <div class="life">
-    <span class="cap">Lifetime</span>
-    <div class="vals"><b class="lc" id="lifeC">0</b><span class="sep">\u00b7</span><b class="lp" id="lifeP">0</b></div>
-    <p class="lead" id="lead"></p>
-  </div>
+   <div class="overview">
+     <div class="overview-copy">
+       <p class="eyebrow">THIS MONTH</p>
+       <h1>The scoreboard</h1>
+       <p class="lead" id="lead"></p>
+     </div>
+     <div class="life">
+       <span class="cap">LIFETIME POINTS</span>
+       <div class="vals"><b class="lc" id="lifeC">0</b><span class="sep">\u00b7</span><b class="lp" id="lifeP">0</b></div>
+     </div>
+   </div>
 
-  <div class="grid" id="grid"></div>
+   <div class="section-head"><span>Monthly score</span><span>Tap to count a point</span></div>
+   <div class="grid" id="grid"></div>
 
   <p class="nudge" id="nudge" role="status"></p>
 
@@ -555,7 +778,7 @@ PAGE = """<!doctype html>
 <div class="scrim" id="infoScrim" hidden>
   <div class="modal sheet" role="dialog" aria-modal="true" aria-labelledby="i-title">
     <p class="m-title" id="i-title">How Tally works</p>
-    <p class="ver">Version 1.2.1</p>
+     <p class="ver" id="infoVersion"></p>
     <h4>Scoring</h4>
     <ul class="info">
       <li><b>+1</b> gives a point, <b>&minus;1</b> takes one back. Neither side can go below zero.</li>
@@ -565,8 +788,8 @@ PAGE = """<!doctype html>
     </ul>
     <h4>What the app is telling you</h4>
     <ul class="info">
-      <li>The <b>page background</b> leans toward whoever is ahead this month \u2014 blue for Cameron, orange for Paget.</li>
-      <li>Each card is ringed in <b>that player&rsquo;s colour</b>.</li>
+      <li>The <b>blue and orange accents</b> keep the two players easy to distinguish.</li>
+      <li>The leader gets a subtle highlight, while the score remains the focus.</li>
       <li>Fall <b>5 behind</b> and a line of encouragement shows up for whoever is trailing.</li>
       <li>Fall <b>10 behind</b> and that player&rsquo;s <b>name pulses red</b> until the gap closes.</li>
       <li>Every <b>10 points</b> in a month sets off a full-screen celebration on both phones.</li>
@@ -576,12 +799,32 @@ PAGE = """<!doctype html>
       <li>When a month ends its result drops into <b>Monthly wins</b> with the winner marked, and the running count of months won updates.</li>
       <li><b>Reset</b> clears this month on both sides. Lifetime totals and finished months are kept.</li>
     </ul>
-    <h4>Syncing</h4>
-    <ul class="info">
-      <li>Both phones refresh each other about every <b>2.5 seconds</b> \u2014 no need to reload.</li>
-      <li>Everything lives on the NAS, so the score is the same on every device.</li>
-    </ul>
+     <h4>Syncing</h4>
+     <ul class="info">
+       <li>Both phones refresh each other about every <b>2.5 seconds</b> \u2014 no need to reload.</li>
+       <li>Everything lives on the NAS, so the score is the same on every device.</li>
+     </ul>
+     <h4>Updates</h4>
+     <ul class="info">
+       <li>Use the update control in the header to check GitHub and install a newer version.</li>
+       <li>The host worker backs up the app files and redeploys Tally; your scores and history are untouched.</li>
+     </ul>
     <div class="m-row"><button class="m-no" id="i-close" type="button">Got it</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="updateScrim" hidden>
+  <div class="modal update-sheet" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+    <div class="update-head"><div><p class="update-kicker">GITHUB</p><p class="m-title" id="updateTitle">Update Tally</p></div>
+      <button class="update-close" id="updateClose" type="button" aria-label="Close">&times;</button></div>
+    <p class="update-state" id="updateState" role="status">Checking GitHub</p>
+    <div class="update-versions"><span>Installed <b id="updateCurrent"></b></span>
+      <span>Latest <b id="updateLatest"></b></span></div>
+    <p class="update-message" id="updateMessage">Updates are checked against Boldestfutura/Tally.</p>
+    <div class="m-row">
+      <button class="update-check" id="updateCheck" type="button">Check for updates</button>
+      <button class="update-install" id="updateInstall" type="button" hidden>Install update</button>
+    </div>
   </div>
 </div>
 
@@ -597,6 +840,7 @@ PAGE = """<!doctype html>
 </div>
 
 <script>
+const APP_VERSION='__APP_VERSION__';
 const PLAYERS=[["cameron","Cameron"],["paget","Paget"]];
 const NAME={cameron:'Cameron',paget:'Paget'};
 
@@ -646,7 +890,7 @@ for(const [who,label] of PLAYERS){
   const c=document.createElement('section');
   c.className='card'; c.dataset.who=who; c.id='card-'+who;
   c.innerHTML=
-    '<p class="name">'+label+'</p>'+
+    '<p class="name" data-initial="'+label[0]+'">'+label+'</p>'+
     '<div class="score" id="s-'+who+'"><span class="n">0</span></div>'+
     '<p class="pts">this month</p>'+
     '<div class="row">'+
@@ -1163,6 +1407,100 @@ if(navigator.storage && navigator.storage.persist){
                                .catch(()=>{});
 }
 
+// The app can check GitHub and ask the host worker to install a release.
+const updateButton=document.getElementById('updates');
+const updateScrim=document.getElementById('updateScrim');
+const updateLabel=document.getElementById('updateLabel');
+const updateState=document.getElementById('updateState');
+const updateCurrent=document.getElementById('updateCurrent');
+const updateLatest=document.getElementById('updateLatest');
+const updateMessage=document.getElementById('updateMessage');
+const updateCheckButton=document.getElementById('updateCheck');
+const updateInstallButton=document.getElementById('updateInstall');
+let updateBusy=false;
+
+function paintUpdate(d){
+  d=d||{};
+  const latest=d.latest||APP_VERSION, available=!!d.available;
+  const busy=['queued','installing','restarting'].includes(d.state);
+  updateCurrent.textContent='v'+(d.current||APP_VERSION);
+  updateLatest.textContent='v'+latest;
+  updateButton.dataset.ready=available?'1':'0';
+  updateLabel.textContent=available?'Update available':'v'+(d.current||APP_VERSION);
+  updateState.textContent=available?'Version v'+latest+' is ready to install':
+    busy?(d.message||'Installing update…'):
+    d.state==='error'?(d.message||'Could not check GitHub'):
+    d.message||'Tally is up to date';
+  updateMessage.textContent=available?'Your score data stays on the NAS. Tally will restart briefly during the update.':
+    busy?'The host worker will install the update and restart Tally.':
+    'Checks Boldestfutura/Tally on GitHub. Your score history stays untouched.';
+  updateInstallButton.hidden=!available;
+  updateInstallButton.disabled=busy||updateBusy;
+  updateCheckButton.disabled=busy||updateBusy;
+}
+
+async function refreshUpdateStatus(){
+  try{
+    const r=await fetch('/api/update/status',{cache:'no-store'});
+    if(r.ok) paintUpdate(await r.json());
+  }catch(e){}
+}
+
+async function checkForUpdate(){
+  updateBusy=true; updateCheckButton.disabled=true; updateState.textContent='Checking GitHub…';
+  try{
+    const r=await fetch('/api/update/check',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    paintUpdate(await r.json());
+    if(!r.ok) updateMessage.textContent='Could not check GitHub. Try again when the connection is back.';
+  }catch(e){ updateState.textContent='Could not reach GitHub'; }
+  finally{ updateBusy=false; updateCheckButton.disabled=false; }
+}
+
+async function installUpdate(){
+  updateInstallButton.disabled=true; updateState.textContent='Queuing update…';
+  try{
+    const r=await fetch('/api/update/install',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    updateMessage.textContent=d.message||d.error||'Update request sent';
+    if(r.ok){ updateState.textContent='Update queued'; updateButton.dataset.ready='0'; }
+    else updateState.textContent=d.error||'Could not queue update';
+  }catch(e){ updateState.textContent='Could not reach the NAS'; }
+  setTimeout(refreshUpdateStatus,1200);
+}
+
+const themeButton=document.getElementById('themeToggle');
+function setTheme(theme,save){
+  document.documentElement.dataset.theme=theme;
+  themeButton.textContent=theme==='dark'?'☀':'◐';
+  themeButton.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
+  const color=theme==='dark'?'#090f1d':'#edf3ff';
+  document.getElementById('themeLight').content=color;
+  document.getElementById('themeDark').content=color;
+  if(save){ try{localStorage.setItem('tally.theme.v1',theme);}catch(e){} }
+}
+let savedTheme='';
+try{ savedTheme=localStorage.getItem('tally.theme.v1')||''; }catch(e){}
+if(savedTheme==='light'||savedTheme==='dark') setTheme(savedTheme,false);
+else themeButton.textContent=(matchMedia('(prefers-color-scheme:dark)').matches?'☀':'◐');
+themeButton.addEventListener('click',()=>{
+  const current=document.documentElement.dataset.theme||
+    (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+  setTheme(current==='dark'?'light':'dark',true);
+});
+document.getElementById('infoVersion').textContent='Version '+APP_VERSION;
+updateButton.addEventListener('click',()=>{
+  updateScrim.hidden=false; refreshUpdateStatus(); updateCheckButton.focus();
+});
+document.getElementById('updateClose').addEventListener('click',()=>{updateScrim.hidden=true;updateButton.focus();});
+updateScrim.addEventListener('click',ev=>{if(ev.target===updateScrim){updateScrim.hidden=true;updateButton.focus();}});
+document.addEventListener('keydown',ev=>{
+  if(!updateScrim.hidden && ev.key==='Escape'){updateScrim.hidden=true;updateButton.focus();}
+});
+updateCheckButton.addEventListener('click',checkForUpdate);
+updateInstallButton.addEventListener('click',installUpdate);
+refreshUpdateStatus();
+setInterval(refreshUpdateStatus,15000);
+
 const resetBtn=document.getElementById('reset');
 const scrim=document.getElementById('scrim');
 const noBtn=document.getElementById('m-no');
@@ -1238,12 +1576,12 @@ MANIFEST = {
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
-    "background_color": "#f7f8fa",
-    "theme_color": "#f7f8fa",
+    "background_color": "#edf3ff",
+    "theme_color": "#2563eb",
     "icons": [
-        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
-        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
-        {"src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png",
+        {"src": "/icon-192.png?v=" + APP_VERSION, "sizes": "192x192", "type": "image/png"},
+        {"src": "/icon-512.png?v=" + APP_VERSION, "sizes": "512x512", "type": "image/png"},
+        {"src": "/icon-512-maskable.png?v=" + APP_VERSION, "sizes": "512x512", "type": "image/png",
          "purpose": "maskable"},
     ],
 }
@@ -1290,13 +1628,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
-            self._send(200, PAGE, "text/html; charset=utf-8")
+            self._send(200, PAGE.replace("__APP_VERSION__", APP_VERSION), "text/html; charset=utf-8")
         elif path == "/api/state":
             with _lock:
                 state = load()
                 if roll_if_needed(state):
                     save(state)
                 self._json(for_client(state))
+        elif path == "/api/update/status":
+            self._json(update_status())
         elif path in ICONS:
             self._send_icon(ICONS[path])
         elif path == "/manifest.webmanifest":
@@ -1318,7 +1658,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if path == "/api/add":
+        if path == "/api/update/check":
+            self._json(check_update())
+        elif path == "/api/update/install":
+            ok, message = request_update()
+            self._json({"ok": ok, "message": message}, 200 if ok else 409)
+        elif path == "/api/add":
             body = self._read_json()
             who = str(body.get("who", ""))
             if who not in PLAYERS:
@@ -1389,6 +1734,7 @@ if __name__ == "__main__":
         roll_if_needed(state)
         save(state)
     threading.Thread(target=month_watcher, daemon=True).start()
+    threading.Thread(target=update_check_loop, daemon=True).start()
     print("tally listening on :%s, data at %s, month %s (%s)"
           % (PORT, DATA, current_period(),
              time.tzname[1 if time.localtime().tm_isdst > 0 else 0]), flush=True)
