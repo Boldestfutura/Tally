@@ -14,6 +14,10 @@ The blue scorecard icon is the visual anchor: clear blue actions, calm surfaces,
 and a strong score-first layout. Cameron and Paget retain distinct blue and
 orange accents so scores are easy to tell apart.
 
+![Tally scoreboard](docs/tally-dashboard.png)
+
+![Tally in-app GitHub updater](docs/tally-updates.png)
+
 ## In-app GitHub updates
 
 Tally checks the public `VERSION` file in `Boldestfutura/Tally`. When a newer
@@ -35,6 +39,10 @@ The worker runs once a minute and only acts when Tally has queued an update.
 Because the updater reads the repository anonymously, make this GitHub
 repository public for the in-app updater to reach it. The scores themselves
 remain private on the NAS.
+
+For each release, bump `APP_VERSION` in `server.py` and `VERSION` together.
+The updater checks `main` every 30 minutes and also supports an immediate check
+from the app.
 
 ## TrueNAS deployment
 

@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -693,6 +693,11 @@ PAGE = """<!doctype html>
   .hist-h b{color:var(--ink);font-size:10px;letter-spacing:.13em}
   .mrow{padding:13px 18px}
   .mrow.live{background:var(--a-soft)}
+  .hist-empty{display:flex;align-items:center;gap:12px;padding:16px 18px;text-align:left}
+  .empty-mark{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;
+              border-radius:11px;background:var(--a-soft);color:var(--a);font-size:18px;font-weight:800}
+  .empty-copy b{display:block;color:var(--ink);font-size:12px}
+  .empty-copy span{display:block;margin-top:2px;color:var(--muted);font-size:11px}
   .iconbtn:hover,.themebtn:hover,.reset:hover,.update-btn:hover{color:var(--a);border-color:var(--ring)}
   .modal{border:1px solid var(--card-brd);border-radius:22px;background:var(--card)}
   .sheet{max-width:440px}
@@ -1068,7 +1073,14 @@ function renderMonths(){
   const box=document.getElementById('months');
   const panel=document.getElementById('hist');
   const live = scores.cameron || scores.paget;
-  if(!months.length && !live){ panel.hidden=true; box.innerHTML=''; return; }
+  if(!months.length && !live){
+    panel.hidden=false;
+    document.getElementById('sum').textContent='';
+    box.innerHTML='<div class="hist-empty"><span class="empty-mark">01</span>'+
+      '<span class="empty-copy"><b>No completed months yet</b>'+
+      '<span>Your first monthly result will appear here.</span></span></div>';
+    return;
+  }
   panel.hidden=false;
 
   const frag=document.createDocumentFragment();

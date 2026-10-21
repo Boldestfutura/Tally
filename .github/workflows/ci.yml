@@ -13,9 +13,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Check versions and compile
+      - name: Check release version and compile
         run: |
-          test "$(cat VERSION)" = "$(python3 -c 'import re; print(re.search(r"^APP_VERSION = \"([^\"]+)\"", open("server.py").read(), re.M).group(1))')"
+          python - <<'PY'
+          import re
+          version = open("VERSION").read().strip()
+          source = open("server.py").read()
+          app_version = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', source, re.M).group(1)
+          assert version == app_version, (version, app_version)
+          PY
           python -m py_compile server.py update-worker.py
       - name: Test scoring
         run: python -m unittest discover -s tests -v
