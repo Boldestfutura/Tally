@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.4"
+APP_VERSION = "2.0.5"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -418,31 +418,34 @@ PAGE = """<!doctype html>
   .wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:0 16px;
         display:flex;flex-direction:column;min-height:100%}
   header{display:flex;align-items:center;justify-content:space-between;
-         gap:12px;padding:6px 2px 18px}
+         gap:12px;padding:6px 2px 16px}
   .h-left{display:flex;align-items:center;gap:10px;min-width:0}
   .h-right{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .logo{display:block;flex:0 0 auto}
   .logo .sa{stroke:var(--a)}
   .logo .sb{stroke:var(--b)}
   .logo .slash{stroke:var(--ink);opacity:.62}
-  .titles{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .titles{display:flex;flex-direction:column;gap:3px;min-width:0}
   .brand{font-size:14px;font-weight:650;letter-spacing:.2em;text-transform:uppercase;
          color:var(--muted);margin:0}
-  .period{font-size:12.5px;font-weight:600;color:var(--ink);margin:0;opacity:.75}
-  .sync{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
-  .dot{width:7px;height:7px;border-radius:50%;background:#35c07a;flex:0 0 auto;transition:background .2s}
+  .period{font-size:14px;font-weight:700;letter-spacing:.025em;color:var(--muted);margin:0}
+  .sync{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto}
+  .sync-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+         clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .dot{width:8px;height:8px;border-radius:50%;background:#35c07a;transition:background .2s}
   .sync[data-off="1"] .dot{background:#e0a32e}
-  .sync[data-off="1"]{color:#e0a32e}
 
-  .life{display:flex;flex-direction:column;align-items:center;gap:3px;margin:-2px 0 15px}
+  .life{display:flex;flex-direction:column;align-items:center;gap:7px;margin:2px auto 20px;
+        width:min(100%,320px);padding:14px 20px;border:1px solid var(--card-brd);
+        border-radius:16px;background:var(--card);box-shadow:var(--shadow);text-align:center}
   .life .cap{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
              color:var(--muted);font-weight:650}
-  .life .vals{display:flex;align-items:baseline;gap:12px;
-              font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .life .vals{display:flex;align-items:center;justify-content:center;gap:14px;
+               font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .life b{font-size:27px;font-weight:750;line-height:1}
   .life .lc{color:var(--a)}
   .life .lp{color:var(--b)}
-  .life .sep{color:var(--muted);font-size:15px;font-weight:500}
+  .life .sep{display:grid;place-items:center;color:var(--muted);font-size:15px;font-weight:500;line-height:1}
 
   .grid{display:grid;grid-template-columns:1fr;gap:12px}
   @media (min-width:640px){ .grid{grid-template-columns:1fr 1fr} }
@@ -479,8 +482,6 @@ PAGE = """<!doctype html>
   }
   .score .n{display:block;will-change:transform,opacity;backface-visibility:hidden}
   .score .ghost{position:absolute;left:0;right:0;top:0}
-  .pts{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 11px}
-
   .row{display:flex;gap:9px}
   button{
     font:inherit;cursor:pointer;border-radius:15px;border:1px solid transparent;
@@ -670,11 +671,8 @@ PAGE = """<!doctype html>
   .logo{width:44px;height:44px;border-radius:13px;object-fit:cover;box-shadow:0 7px 20px -8px var(--a)}
   .titles{gap:4px}
   .brand{font-size:16px;letter-spacing:.11em;color:var(--ink);font-weight:800}
-  .tagline{margin:0;color:var(--muted);font-size:11px;font-weight:550;letter-spacing:.015em}
-  .period{font-size:11.5px;letter-spacing:.055em;color:var(--muted);font-weight:650}
-  .h-right{gap:8px}
-  .sync{padding:7px 10px;border:1px solid var(--card-brd);border-radius:999px;
-        background:var(--card);font-size:11px;font-weight:650;min-height:32px}
+   .period{font-size:14px;letter-spacing:.025em;color:var(--muted);font-weight:700}
+   .h-right{gap:8px}
    .settings-trigger{width:36px;height:36px}
   .update-btn{display:flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;
               border:1px solid var(--card-brd);border-radius:12px;background:var(--card);
@@ -682,17 +680,8 @@ PAGE = """<!doctype html>
   .update-glyph{font-size:15px;line-height:1;font-weight:850}
   .update-btn[data-ready="1"]{border-color:color-mix(in srgb,var(--a) 38%,var(--card-brd));
                                background:var(--a-soft);color:var(--a)}
-  .overview{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:2px 0 20px}
-  .overview-copy{min-width:0}
-  .eyebrow{margin:0 0 5px;color:var(--a);font-size:9px;font-weight:850;letter-spacing:.17em}
-  .overview h1{margin:0;font-size:clamp(24px,5vw,34px);line-height:1.08;letter-spacing:-.045em}
-  .overview .lead{margin:7px 0 0;min-height:1.25em;text-align:left;font-size:12px;font-weight:650}
-  .life{flex:0 0 auto;align-items:center;flex-direction:row;justify-content:space-between;gap:18px;
-        margin:0;padding:12px 15px;border:1px solid var(--card-brd);
-        border-radius:16px;background:var(--card);box-shadow:var(--shadow)}
-  .life .cap{font-size:10px;letter-spacing:.15em;color:var(--muted)}
-  .life .vals{gap:9px}
-  .life b{font-size:clamp(22px,4vw,30px);font-weight:800}
+   .life .cap{font-size:10px;letter-spacing:.15em;color:var(--muted)}
+   .life b{font-size:clamp(22px,4vw,30px);font-weight:800}
   .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
                 margin:0 2px 10px;color:var(--ink);font-size:13px;font-weight:800}
   .section-head span+span{color:var(--muted);font-size:10.5px;font-weight:600}
@@ -708,15 +697,14 @@ PAGE = """<!doctype html>
   .name::before{content:attr(data-initial);display:grid;place-items:center;width:28px;height:28px;
                 border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:12px;
                 font-weight:850;letter-spacing:0}
-   .score{margin:14px 0 3px;font-size:clamp(70px,13vw,108px);font-weight:780;
+   .score{margin:14px 0 18px;font-size:clamp(70px,13vw,108px);font-weight:780;
           letter-spacing:.02em;text-align:center}
-  .pts{margin:0 0 18px;font-size:10px;letter-spacing:.16em;color:var(--muted)}
-  .row{gap:10px}
+   .row{gap:10px}
   .row button{min-height:54px;border-radius:15px}
   .sub{flex:0 0 82px;font-size:22px;background:var(--faint);border-color:var(--card-brd);color:var(--muted)}
   .add{font-size:18px;font-weight:800;background:var(--accent);box-shadow:0 8px 20px -10px var(--accent)}
-  .nudge{padding:9px 14px;border-radius:12px;background:var(--a-soft);color:var(--a);
-         font-size:12px;font-weight:700}
+   .nudge{padding:0;border:0;border-radius:0;background:transparent;color:var(--a);
+          font-size:12px;font-weight:700}
   .nudge:empty{display:none}
   .hist{margin-top:22px;border:1px solid var(--card-brd);border-radius:18px;
         background:var(--card);box-shadow:var(--shadow)}
@@ -757,9 +745,7 @@ PAGE = """<!doctype html>
     .h-right{gap:6px}
     .update-btn{width:36px;padding:0;justify-content:center}
     .update-btn .update-label{display:none}
-    .overview{align-items:flex-start;flex-direction:column;gap:12px}
-    .life{width:100%;padding:11px 13px}
-    .sub{flex-basis:66px}
+     .sub{flex-basis:66px}
   }
 </style>
 </head>
@@ -770,15 +756,14 @@ PAGE = """<!doctype html>
 <div class="wrap">
   <header>
    <div class="h-left">
-     <img class="logo" src="/icon-192.png?v=__APP_VERSION__" alt="Tally logo">
-     <div class="titles">
-       <p class="brand">Tally</p>
-       <p class="tagline">A little friendly competition</p>
-       <p class="period" id="period"></p>
+      <img class="logo" src="/icon-192.png?v=__APP_VERSION__" alt="Tally logo">
+      <div class="titles">
+        <p class="brand">Tally</p>
+        <p class="period" id="period"></p>
+      </div>
      </div>
-    </div>
      <div class="h-right">
-      <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
+      <span class="sync" id="sync" title="Connected" aria-label="Connected"><span class="dot"></span><span class="sync-text" id="syncText"></span></span>
        <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
         <span class="update-glyph" aria-hidden="true">↓</span><span class="update-label" id="updateLabel">Updates</span></button>
       <div class="settings-wrap" id="settingsWrap">
@@ -812,19 +797,12 @@ PAGE = """<!doctype html>
     </div>
   </header>
 
-   <div class="overview">
-     <div class="overview-copy">
-       <p class="eyebrow">THIS MONTH</p>
-       <h1>The scoreboard</h1>
-       <p class="lead" id="lead"></p>
-     </div>
-     <div class="life">
-       <span class="cap">LIFETIME POINTS</span>
-       <div class="vals"><b class="lc" id="lifeC">0</b><span class="sep">\u00b7</span><b class="lp" id="lifeP">0</b></div>
-     </div>
+   <div class="life">
+     <span class="cap">LIFETIME POINTS</span>
+     <div class="vals"><b class="lc" id="lifeC">0</b><span class="sep">\u00b7</span><b class="lp" id="lifeP">0</b></div>
    </div>
 
-   <div class="section-head"><span>Monthly score</span><span>Tap to count a point</span></div>
+   <div class="section-head"><span>This month</span><span>Tap to count a point</span></div>
    <div class="grid" id="grid"></div>
 
   <p class="nudge" id="nudge" role="status"></p>
@@ -924,7 +902,6 @@ const RALLY=[
  "{name}, time to make it interesting.",
  "Bigger leads than this have gone.",
  "Deep breath, {name}. One at a time.",
- "The scoreboard isn't the final word.",
  "{name}, make them nervous.",
  "Underdogs are more fun to watch anyway.",
  "Keep going, {name} \\u2014 it only takes a streak.",
@@ -952,7 +929,6 @@ for(const [who,label] of PLAYERS){
   c.innerHTML=
     '<p class="name" data-initial="'+label[0]+'">'+label+'</p>'+
     '<div class="score" id="s-'+who+'"><span class="n">0</span></div>'+
-    '<p class="pts">this month</p>'+
     '<div class="row">'+
       '<button class="sub" data-who="'+who+'" data-delta="-1" aria-label="Remove a point from '+label+'">\\u22121</button>'+
       '<button class="add" data-who="'+who+'" data-delta="1" aria-label="Add a point to '+label+'">+1</button>'+
@@ -1257,10 +1233,6 @@ function render(){
   document.getElementById('tintB').style.opacity=(0.3 + 1.4*(1-share)).toFixed(3);
 
   const d=scores.cameron-scores.paget;
-  const lead=document.getElementById('lead');
-  if(total===0) lead.textContent='Nil-all this month';
-  else if(d===0) lead.textContent='All square this month at '+scores.cameron;
-  else lead.textContent=(d>0?'Cameron':'Paget')+' leads by '+Math.abs(d)+' this month';
 
   document.querySelectorAll('.sub').forEach(b=>{ b.disabled = scores[b.dataset.who]<=0; });
   document.getElementById('lifeC').textContent=life.cameron;
@@ -1391,13 +1363,14 @@ function setSync(ok){
   const s=document.getElementById('sync');
   const n=pendingCount();
   s.dataset.off = (ok && !n) ? '0':'1';
-  // stay silent while everything is through; otherwise say what is owed and,
-  // with no signal, how old the numbers on screen are - "reconnecting" on its
-  // own tells you nothing about whether you can trust what you are looking at
   const t=document.getElementById('syncText');
-  if(n) t.textContent = pendingWord();
-  else if(ok) t.textContent = '';
-  else t.textContent = savedAt ? 'offline \u00b7 ' + ago(savedAt) : 'reconnecting';
+  let status;
+  if(n) status=pendingWord();
+  else if(ok) status='Connected';
+  else status=savedAt ? 'Offline \u00b7 ' + ago(savedAt) : 'Reconnecting';
+  t.textContent=status;
+  s.setAttribute('aria-label',status);
+  s.title=status;
 }
 
 async function post(path,body){
