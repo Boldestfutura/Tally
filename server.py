@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.5"
+APP_VERSION = "2.0.6"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -436,8 +436,7 @@ PAGE = """<!doctype html>
   .sync[data-off="1"] .dot{background:#e0a32e}
 
   .life{display:flex;flex-direction:column;align-items:center;gap:7px;margin:2px auto 20px;
-        width:min(100%,320px);padding:14px 20px;border:1px solid var(--card-brd);
-        border-radius:16px;background:var(--card);box-shadow:var(--shadow);text-align:center}
+        width:min(100%,320px);padding:14px 20px;text-align:center}
   .life .cap{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
              color:var(--muted);font-weight:650}
   .life .vals{display:flex;align-items:center;justify-content:center;gap:14px;
@@ -689,14 +688,10 @@ PAGE = """<!doctype html>
   @media(min-width:640px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .card{padding:clamp(16px,2.6vw,24px);border-radius:22px;border:1px solid var(--card-brd);
         background:var(--card);box-shadow:var(--shadow);text-align:left;transition:transform .2s ease}
-  .card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--accent)}
-  .card[data-lead="1"]{transform:translateY(-2px)}
+   .card[data-lead="1"]{transform:translateY(-2px)}
   .card[data-who="cameron"]{--accent:var(--a);--accent-soft:var(--a-soft)}
   .card[data-who="paget"]{--accent:var(--b);--accent-soft:var(--b-soft)}
-  .name{justify-content:flex-start;margin:0;color:var(--ink);font-size:14px;font-weight:750}
-  .name::before{content:attr(data-initial);display:grid;place-items:center;width:28px;height:28px;
-                border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:12px;
-                font-weight:850;letter-spacing:0}
+   .name{justify-content:center;margin:0;color:var(--ink);font-size:14px;font-weight:750}
    .score{margin:14px 0 18px;font-size:clamp(70px,13vw,108px);font-weight:780;
           letter-spacing:.02em;text-align:center}
    .row{gap:10px}
@@ -926,8 +921,8 @@ const grid=document.getElementById('grid');
 for(const [who,label] of PLAYERS){
   const c=document.createElement('section');
   c.className='card'; c.dataset.who=who; c.id='card-'+who;
-  c.innerHTML=
-    '<p class="name" data-initial="'+label[0]+'">'+label+'</p>'+
+    c.innerHTML=
+      '<p class="name">'+label+'</p>'+
     '<div class="score" id="s-'+who+'"><span class="n">0</span></div>'+
     '<div class="row">'+
       '<button class="sub" data-who="'+who+'" data-delta="-1" aria-label="Remove a point from '+label+'">\\u22121</button>'+
