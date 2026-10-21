@@ -23,6 +23,7 @@ job={"user":"root","command":command,
      "description":name+" GitHub updater","enabled":True,
      "stdout":False,"stderr":False,
      "schedule":{"minute":"*","hour":"*","dom":"*","month":"*","dow":"*"}}
+r=subprocess.run(["midclt","call","cronjob.create",json.dumps(job)],capture_output=True,text=True)
 if r.returncode:
     print(r.stderr or r.stdout,file=sys.stderr);raise SystemExit(r.returncode)
 print("Tally GitHub update worker installed.")
