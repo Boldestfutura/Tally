@@ -14,7 +14,7 @@ PORT = int(os.environ.get("TALLY_PORT", "8080"))
 PLAYERS = ("cameron", "paget")
 LABELS = {"cameron": "Cameron", "paget": "Paget"}
 
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.0.3"
 UPDATE_REPO = "Boldestfutura/Tally"
 UPDATE_BRANCH = "main"
 UPDATE_DIR = os.path.dirname(DATA) or "."
@@ -566,14 +566,40 @@ PAGE = """<!doctype html>
   .mrow.draw .win{color:var(--muted);background:var(--faint)}
   .hist-empty{padding:16px 15px;color:var(--muted);font-size:13px;text-align:center}
 
-  .iconbtn{flex:0 0 auto;width:30px;height:30px;padding:0;border-radius:50%;
-           font-size:14px;font-weight:700;font-style:italic;font-family:Georgia,serif;
-           color:var(--muted);background:var(--faint);border-color:var(--card-brd);
-           display:flex;align-items:center;justify-content:center;line-height:1}
-  .iconbtn:hover{color:var(--ink)}
-  .reset{flex:0 0 auto;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:11px;
-         color:var(--muted);background:var(--faint);border-color:var(--card-brd)}
-  .reset:hover{background:var(--faint);color:var(--ink);filter:brightness(.97)}
+   .settings-wrap{position:relative;flex:0 0 auto}
+   .settings-trigger{display:grid;place-items:center;width:36px;height:36px;padding:0;
+          border:1px solid var(--card-brd);border-radius:12px;background:var(--card);
+          color:var(--muted);box-shadow:0 2px 8px rgba(18,38,74,.04)}
+   .settings-trigger svg{display:block;width:18px;height:18px;stroke:currentColor;stroke-width:1.8;
+          stroke-linecap:round;stroke-linejoin:round;fill:none}
+   .settings-trigger:hover{color:var(--a);border-color:var(--ring)}
+   .settings-popout{position:absolute;top:calc(100% + 9px);right:0;z-index:30;
+          width:min(252px,calc(100vw - 32px));padding:11px;
+          border:1px solid var(--card-brd);border-radius:16px;background:var(--card);
+          box-shadow:0 18px 42px -18px rgba(0,0,0,.38);
+          -webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);
+          animation:rise .16s ease-out}
+   .settings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+          padding:3px 4px 10px}
+   .settings-head b{font-size:13px;font-weight:800}
+   .settings-version{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--muted);
+          font-variant-numeric:tabular-nums}
+   .settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+          padding:7px 4px 9px;color:var(--ink);font-size:12px;font-weight:650}
+   .themebtn{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;padding:0;
+          border:1px solid var(--card-brd);border-radius:11px;background:var(--faint);color:var(--muted)}
+   .themebtn:hover{color:var(--a);border-color:var(--ring)}
+   .themebtn svg{display:block;width:18px;height:18px;stroke:currentColor;stroke-width:1.8;
+          stroke-linecap:round;stroke-linejoin:round;fill:none}
+   .settings-divider{height:1px;margin:2px 0 6px;background:var(--card-brd)}
+   .settings-action{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;
+          padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--ink);
+          text-align:left;font-size:12px;font-weight:650}
+   .settings-action:hover{background:var(--faint);color:var(--a)}
+   .settings-action svg{width:17px;height:17px;flex:0 0 auto;stroke:currentColor;stroke-width:1.8;
+          stroke-linecap:round;stroke-linejoin:round;fill:none}
+   .settings-action.reset{color:var(--muted)}
+   .settings-action.reset:hover{color:var(--a)}
 
   [hidden]{display:none !important}
   .scrim{
@@ -649,12 +675,7 @@ PAGE = """<!doctype html>
   .h-right{gap:8px}
   .sync{padding:7px 10px;border:1px solid var(--card-brd);border-radius:999px;
         background:var(--card);font-size:11px;font-weight:650;min-height:32px}
-  .iconbtn,.themebtn{width:36px;height:36px;border:1px solid var(--card-brd);border-radius:12px;
-        background:var(--card);color:var(--muted);box-shadow:0 2px 8px rgba(18,38,74,.04)}
-  .iconbtn{font-size:15px}
-  .themebtn{font-size:17px;line-height:1}
-  .reset{padding:9px 13px;border:1px solid var(--card-brd);border-radius:12px;
-         background:var(--card);color:var(--muted);font-weight:700}
+   .settings-trigger{width:36px;height:36px}
   .update-btn{display:flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;
               border:1px solid var(--card-brd);border-radius:12px;background:var(--card);
               color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap}
@@ -687,7 +708,8 @@ PAGE = """<!doctype html>
   .name::before{content:attr(data-initial);display:grid;place-items:center;width:28px;height:28px;
                 border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:12px;
                 font-weight:850;letter-spacing:0}
-  .score{margin:14px 0 3px;font-size:clamp(70px,13vw,108px);font-weight:780;letter-spacing:-.065em}
+   .score{margin:14px 0 3px;font-size:clamp(70px,13vw,108px);font-weight:780;
+          letter-spacing:.02em;text-align:center}
   .pts{margin:0 0 18px;font-size:10px;letter-spacing:.16em;color:var(--muted)}
   .row{gap:10px}
   .row button{min-height:54px;border-radius:15px}
@@ -707,7 +729,7 @@ PAGE = """<!doctype html>
               border-radius:11px;background:var(--a-soft);color:var(--a);font-size:18px;font-weight:800}
   .empty-copy b{display:block;color:var(--ink);font-size:12px}
   .empty-copy span{display:block;margin-top:2px;color:var(--muted);font-size:11px}
-  .iconbtn:hover,.themebtn:hover,.reset:hover,.update-btn:hover{color:var(--a);border-color:var(--ring)}
+   .update-btn:hover{color:var(--a);border-color:var(--ring)}
   .modal{border:1px solid var(--card-brd);border-radius:22px;background:var(--card)}
   .sheet{max-width:440px}
   .m-title{font-size:19px;font-weight:800;letter-spacing:-.02em}
@@ -755,14 +777,39 @@ PAGE = """<!doctype html>
        <p class="period" id="period"></p>
      </div>
     </div>
-    <div class="h-right">
-     <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
-      <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
-       <span class="update-glyph" aria-hidden="true">↓</span><span class="update-label" id="updateLabel">Updates</span></button>
-     <button class="themebtn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
-     <button class="iconbtn" id="info" type="button" aria-label="How Tally works">i</button>
-     <button class="reset" id="reset" type="button">Reset</button>
-   </div>
+     <div class="h-right">
+      <span class="sync" id="sync" title="connection"><span class="dot"></span><span id="syncText"></span></span>
+       <button class="update-btn" id="updates" type="button" aria-label="Tally updates" data-ready="0">
+        <span class="update-glyph" aria-hidden="true">↓</span><span class="update-label" id="updateLabel">Updates</span></button>
+      <div class="settings-wrap" id="settingsWrap">
+       <button class="settings-trigger" id="settingsToggle" type="button" aria-label="Settings"
+               aria-expanded="false" aria-controls="settingsMenu" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg>
+       </button>
+       <div class="settings-popout" id="settingsMenu" hidden>
+        <div class="settings-head"><b>Settings</b><span class="settings-version" id="settingsVersion"></span></div>
+        <div class="settings-row"><span>Appearance</span>
+         <button class="themebtn" id="themeToggle" type="button" role="switch" aria-checked="false" aria-label="Dark mode">
+          <svg id="themeSun" viewBox="0 0 24 24" aria-hidden="true" hidden>
+           <circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2.5 12h2m15 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
+          </svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+           <path d="M20.2 15.4A8.6 8.6 0 0 1 8.6 3.8 8.7 8.7 0 1 0 20.2 15.4Z"/>
+          </svg>
+         </button>
+        </div>
+        <div class="settings-divider"></div>
+        <button class="settings-action" id="info" type="button">
+         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg>
+         <span>How Tally works</span>
+        </button>
+        <button class="settings-action reset" id="reset" type="button">
+         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/></svg>
+         <span>Reset this month</span>
+        </button>
+       </div>
+      </div>
+    </div>
   </header>
 
    <div class="overview">
@@ -792,8 +839,7 @@ PAGE = """<!doctype html>
 <div class="scrim" id="infoScrim" hidden>
   <div class="modal sheet" role="dialog" aria-modal="true" aria-labelledby="i-title">
     <p class="m-title" id="i-title">How Tally works</p>
-     <p class="ver" id="infoVersion"></p>
-    <h4>Scoring</h4>
+     <h4>Scoring</h4>
     <ul class="info">
       <li><b>+1</b> gives a point, <b>&minus;1</b> takes one back. Neither side can go below zero.</li>
       <li>The two big numbers are <b>this month only</b>. They reset to 0 by themselves at midnight on the 1st, Melbourne time.</li>
@@ -1490,9 +1536,13 @@ async function installUpdate(){
 }
 
 const themeButton=document.getElementById('themeToggle');
+const themeSun=document.getElementById('themeSun');
+const themeMoon=document.getElementById('themeMoon');
 function setTheme(theme,save){
   document.documentElement.dataset.theme=theme;
-  themeButton.textContent=theme==='dark'?'☀':'◐';
+  themeSun.toggleAttribute('hidden',theme!=='dark');
+  themeMoon.toggleAttribute('hidden',theme==='dark');
+  themeButton.setAttribute('aria-checked',theme==='dark'?'true':'false');
   themeButton.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
   const color=theme==='dark'?'#090f1d':'#edf3ff';
   document.getElementById('themeLight').content=color;
@@ -1501,14 +1551,33 @@ function setTheme(theme,save){
 }
 let savedTheme='';
 try{ savedTheme=localStorage.getItem('tally.theme.v1')||''; }catch(e){}
-if(savedTheme==='light'||savedTheme==='dark') setTheme(savedTheme,false);
-else themeButton.textContent=(matchMedia('(prefers-color-scheme:dark)').matches?'☀':'◐');
+setTheme(savedTheme==='light'||savedTheme==='dark'?savedTheme:
+  (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'),false);
 themeButton.addEventListener('click',()=>{
   const current=document.documentElement.dataset.theme||
     (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
   setTheme(current==='dark'?'light':'dark',true);
 });
-document.getElementById('infoVersion').textContent='Version '+APP_VERSION;
+const settingsWrap=document.getElementById('settingsWrap');
+const settingsToggle=document.getElementById('settingsToggle');
+const settingsMenu=document.getElementById('settingsMenu');
+function closeSettings(returnFocus){
+  settingsMenu.hidden=true;
+  settingsToggle.setAttribute('aria-expanded','false');
+  if(returnFocus) settingsToggle.focus();
+}
+settingsToggle.addEventListener('click',()=>{
+  const opening=settingsMenu.hidden;
+  settingsMenu.hidden=!opening;
+  settingsToggle.setAttribute('aria-expanded',opening?'true':'false');
+});
+document.addEventListener('click',ev=>{
+  if(!settingsMenu.hidden&&!settingsWrap.contains(ev.target)) closeSettings(false);
+});
+document.addEventListener('keydown',ev=>{
+  if(!settingsMenu.hidden&&ev.key==='Escape'){ev.preventDefault();closeSettings(true);}
+});
+document.getElementById('settingsVersion').textContent='Version '+APP_VERSION;
 updateButton.addEventListener('click',()=>{
   updateScrim.hidden=false; refreshUpdateStatus(); updateCheckButton.focus();
 });
@@ -1538,16 +1607,16 @@ function closeAsk(){
   if(lastFocus && lastFocus.focus) lastFocus.focus();
 }
 
-resetBtn.addEventListener('click',openAsk);
+resetBtn.addEventListener('click',()=>{closeSettings(false);settingsToggle.focus();openAsk();});
 
 const infoScrim=document.getElementById('infoScrim');
 const infoBtn=document.getElementById('info');
 const infoClose=document.getElementById('i-close');
-infoBtn.addEventListener('click',()=>{ infoScrim.hidden=false; infoClose.focus(); });
-infoClose.addEventListener('click',()=>{ infoScrim.hidden=true; infoBtn.focus(); });
-infoScrim.addEventListener('click',ev=>{ if(ev.target===infoScrim){ infoScrim.hidden=true; infoBtn.focus(); } });
+infoBtn.addEventListener('click',()=>{ closeSettings(false); infoScrim.hidden=false; infoClose.focus(); });
+infoClose.addEventListener('click',()=>{ infoScrim.hidden=true; settingsToggle.focus(); });
+infoScrim.addEventListener('click',ev=>{ if(ev.target===infoScrim){ infoScrim.hidden=true; settingsToggle.focus(); } });
 document.addEventListener('keydown',ev=>{
-  if(!infoScrim.hidden && ev.key==='Escape'){ infoScrim.hidden=true; infoBtn.focus(); }
+  if(!infoScrim.hidden && ev.key==='Escape'){ infoScrim.hidden=true; settingsToggle.focus(); }
 });
 noBtn.addEventListener('click',closeAsk);
 yesBtn.addEventListener('click',()=>{ closeAsk(); buzz([10,40,10]); post('/api/reset'); });

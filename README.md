@@ -16,6 +16,8 @@ orange accents so scores are easy to tell apart.
 
 ![Tally dashboard, light desktop](docs/tally-dashboard.png)
 
+![Tally settings popout](docs/tally-settings.png)
+
 | Phone, light | Phone, dark |
 |:--:|:--:|
 | ![Tally phone light](docs/tally-phone-light.png) | ![Tally phone dark](docs/tally-phone-dark.png) |
